@@ -1,63 +1,89 @@
 use bevy::{
+    color::palettes::css::{BLUE, GREEN, WHITE},
     prelude::*,
-    reflect::TypePath,
-    render::render_resource::AsBindGroup,
-    shader::ShaderRef,
-    sprite_render::{AlphaMode2d, Material2d, Material2dPlugin},
+    sprite_render::AlphaMode2d,
 };
-
-/// This example uses a shader source file from the assets subdirectory
-const SHADER_ASSET_PATH: &str = "shaders/custom_material_2d.wgsl";
 
 fn main() {
     App::new()
-        .add_plugins((
-            DefaultPlugins,
-            Material2dPlugin::<CustomMaterial>::default(),
-        ))
+        .add_plugins(DefaultPlugins)
         .add_systems(Startup, setup)
         .run();
 }
 
-// Setup a simple 2d scene
 fn setup(
     mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<CustomMaterial>>,
     asset_server: Res<AssetServer>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
-    // camera
     commands.spawn(Camera2d);
 
-    // quad
+    let texture_handle = asset_server.load("dr_mario.png");
+    let mesh_handle = meshes.add(Rectangle::from_size(Vec2::splat(256.0)));
+
+    // opaque
+    // Each sprite should be square with the transparent parts being completely black
+    // The blue sprite should be on top with the white and green one behind it
+
     commands.spawn((
-        Mesh2d(meshes.add(Rectangle::default())),
-        MeshMaterial2d(materials.add(CustomMaterial {
-            color: LinearRgba::BLUE,
-            color_texture: Some(asset_server.load("dr_mario.png")),
+        Mesh2d(mesh_handle.clone()),
+        MeshMaterial2d(materials.add(ColorMaterial {
+            color: WHITE.into(),
+            alpha_mode: AlphaMode2d::Opaque,
+            texture: Some(texture_handle.clone()),
+            ..default()
         })),
-        Transform::default().with_scale(Vec3::splat(128.)),
+        Transform::from_xyz(-400.0, 0.0, 1.0),
     ));
-}
 
-// This is the struct that will be passed to your shader
-#[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
-struct CustomMaterial {
-    #[uniform(0)]
-    color: LinearRgba,
-    #[texture(1)]
-    #[sampler(2)]
-    color_texture: Option<Handle<Image>>,
-}
+    commands.spawn((
+        Mesh2d(mesh_handle.clone()),
+        MeshMaterial2d(materials.add(ColorMaterial {
+            color: BLUE.into(),
+            alpha_mode: AlphaMode2d::Opaque,
+            texture: Some(texture_handle.clone()),
+            ..default()
+        })),
+        Transform::from_xyz(-300.0, 0.0, 1.0),
+    ));
 
-/// The Material2d trait is very configurable, but comes with sensible defaults for all methods.
-/// You only need to implement functions for features that need non-default behavior. See the Material2d api docs for details!
-impl Material2d for CustomMaterial {
-    fn fragment_shader() -> ShaderRef {
-        SHADER_ASSET_PATH.into()
-    }
+    commands.spawn((
+        Mesh2d(mesh_handle.clone()),
+        MeshMaterial2d(materials.add(ColorMaterial {
+            color: GREEN.into(),
+            alpha_mode: AlphaMode2d::Opaque,
+            texture: Some(texture_handle.clone()),
+            ..default()
+        })),
+        Transform::from_xyz(-200.0, 0.0, -1.0),
+    ));
 
-    fn alpha_mode(&self) -> AlphaMode2d {
-        AlphaMode2d::Mask(0.5)
-    }
+    // Test the interaction between opaque/mask and transparent meshes
+    // The white sprite should be:
+    // - only the icon is opaque but background is transparent
+    // - on top of the green sprite
+    // - behind the blue sprite
+
+    commands.spawn((
+        Mesh2d(mesh_handle.clone()),
+        MeshMaterial2d(materials.add(ColorMaterial {
+            color: BLUE.with_alpha(0.7).into(),
+            alpha_mode: AlphaMode2d::Blend,
+            texture: Some(texture_handle.clone()),
+            ..default()
+        })),
+        Transform::from_xyz(300.0, 0.0, 1.0),
+    ));
+
+    commands.spawn((
+        Mesh2d(mesh_handle.clone()),
+        MeshMaterial2d(materials.add(ColorMaterial {
+            color: GREEN.with_alpha(0.7).into(),
+            alpha_mode: AlphaMode2d::Blend,
+            texture: Some(texture_handle),
+            ..default()
+        })),
+        Transform::from_xyz(400.0, 0.0, -1.0),
+    ));
 }
