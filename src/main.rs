@@ -35,6 +35,7 @@ fn draw_cursor(
 
 fn setup(
     mut commands: Commands,
+    asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
     window: Single<&Window>,
@@ -65,6 +66,13 @@ fn setup(
         },
     ));
 
+
+    // add a couple of playing cards
+
+    commands.spawn((
+        Mesh2d(meshes.add(Rectangle::new(50.0, 70.0))),
+        MeshMaterial2d(materials.add(asset_server.load("A_spade.png"))),
+    ));
 
 
 }
