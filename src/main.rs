@@ -1,89 +1,70 @@
 use bevy::{
-    color::palettes::css::{BLUE, GREEN, WHITE},
+    camera::Viewport,
+    color::palettes::{
+        basic::WHITE,
+        css::{GREEN, RED},
+    },
+    math::ops::powf,
     prelude::*,
-    sprite_render::AlphaMode2d,
 };
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_systems(Startup, setup)
-        .run();
+        .add_systems(Update, draw_cursor)
+        .run(); 
+}
+
+
+fn draw_cursor(
+    camera_query: Single<(&Camera, &GlobalTransform)>,
+    window: Single<&Window>,
+    mut gizmos: Gizmos,
+) {
+    let (camera, transform) = *camera_query;
+
+    if let Some(cursor_position) = window.cursor_position() 
+        && let Ok(world_pos) = camera.viewport_to_world_2d(transform, cursor_position)    
+    {
+        gizmos.circle_2d(world_pos, 10., WHITE);
+    }
+
+    
 }
 
 fn setup(
     mut commands: Commands,
-    asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
+    window: Single<&Window>,
 ) {
-    commands.spawn(Camera2d);
+    let window_size = window.resolution.physical_size().as_vec2();
 
-    let texture_handle = asset_server.load("dr_mario.png");
-    let mesh_handle = meshes.add(Rectangle::from_size(Vec2::splat(256.0)));
-
-    // opaque
-    // Each sprite should be square with the transparent parts being completely black
-    // The blue sprite should be on top with the white and green one behind it
-
+    // initialise centered, non-window-filling viewport
     commands.spawn((
-        Mesh2d(mesh_handle.clone()),
-        MeshMaterial2d(materials.add(ColorMaterial {
-            color: WHITE.into(),
-            alpha_mode: AlphaMode2d::Opaque,
-            texture: Some(texture_handle.clone()),
+        Camera2d,
+        Camera {
+            viewport: Some(Viewport {
+                physical_position: (window_size * 0.125).as_uvec2(),
+                physical_size: (window_size * 0.75).as_uvec2(),
+                ..default()
+            }),
             ..default()
-        })),
-        Transform::from_xyz(-400.0, 0.0, 1.0),
+        },
     ));
 
+    //Create a UI explaining shit
     commands.spawn((
-        Mesh2d(mesh_handle.clone()),
-        MeshMaterial2d(materials.add(ColorMaterial {
-            color: BLUE.into(),
-            alpha_mode: AlphaMode2d::Opaque,
-            texture: Some(texture_handle.clone()),
+        Text::new( "mouse will follow the cursor dipshit"),
+        Node {
+            position_type: PositionType::Absolute,
+            top: px(12),
+            left: px(12),
             ..default()
-        })),
-        Transform::from_xyz(-300.0, 0.0, 1.0),
+        },
     ));
 
-    commands.spawn((
-        Mesh2d(mesh_handle.clone()),
-        MeshMaterial2d(materials.add(ColorMaterial {
-            color: GREEN.into(),
-            alpha_mode: AlphaMode2d::Opaque,
-            texture: Some(texture_handle.clone()),
-            ..default()
-        })),
-        Transform::from_xyz(-200.0, 0.0, -1.0),
-    ));
 
-    // Test the interaction between opaque/mask and transparent meshes
-    // The white sprite should be:
-    // - only the icon is opaque but background is transparent
-    // - on top of the green sprite
-    // - behind the blue sprite
 
-    commands.spawn((
-        Mesh2d(mesh_handle.clone()),
-        MeshMaterial2d(materials.add(ColorMaterial {
-            color: BLUE.with_alpha(0.7).into(),
-            alpha_mode: AlphaMode2d::Blend,
-            texture: Some(texture_handle.clone()),
-            ..default()
-        })),
-        Transform::from_xyz(300.0, 0.0, 1.0),
-    ));
-
-    commands.spawn((
-        Mesh2d(mesh_handle.clone()),
-        MeshMaterial2d(materials.add(ColorMaterial {
-            color: GREEN.with_alpha(0.7).into(),
-            alpha_mode: AlphaMode2d::Blend,
-            texture: Some(texture_handle),
-            ..default()
-        })),
-        Transform::from_xyz(400.0, 0.0, -1.0),
-    ));
 }
