@@ -15,6 +15,10 @@ fn main() {
         .run();
 }
 
+const CARD_W: f32 = 50.0;
+const CARD_H: f32 = 70.0;
+const DRAG_STIFFNESS: f32 = 15.0;
+
 fn draw_cursor(
     camera_query: Single<(&Camera, &GlobalTransform)>,
     window: Single<&Window>,
@@ -62,14 +66,11 @@ fn setup(
         },
     ));
 
-    // add a playing card
-    let rectangle_mesh = Rectangle::new(50.0, 70.0);
     commands
         .spawn((
             RigidBody::Dynamic,
-            Collider::rectangle(50.0, 70.0),
-            LinearVelocity::ZERO,
-            Mesh2d(meshes.add(rectangle_mesh)),
+            Collider::rectangle(CARD_W, CARD_H),
+            Mesh2d(meshes.add(Rectangle::new(CARD_W, CARD_H))),
             MeshMaterial2d(materials.add(asset_server.load("A_spade.png"))),
         ))
         .observe(|event: On<Pointer<DragStart>>, mut commands: Commands| {
@@ -92,17 +93,21 @@ fn follow_cursor(
     // get the camera (for cursor position) & get its transform (to convert this to world space)
     let (camera, camera_transform) = *camera_query;
 
-    // collider_query may have many entities being held
-    for (collider_transform, mut collider_linear_velocity) in collider_query.iter_mut() {
-        // get cursor position in screen space and convert to world space
-        if let Some(cursor_screen_pos) = window.cursor_position()
-            && let Ok(cursor_world_pos) =
-                camera.viewport_to_world_2d(camera_transform, cursor_screen_pos)
-        {
-            let difference = cursor_world_pos - collider_transform.translation.truncate();
+    // get cursor position in screen space and convert to world space
+    if let Some(cursor_screen_pos) = window.cursor_position()
+        && let Ok(cursor_world_pos) =
+            camera.viewport_to_world_2d(camera_transform, cursor_screen_pos)
+    {
+        // collider_query may have many entities being held
+        for (collider_transform, mut collider_linear_velocity) in collider_query.iter_mut() {
+            {
+                let difference = cursor_world_pos - collider_transform.translation.truncate();
 
-            // move object in that direction (to cursor)!
-            collider_linear_velocity.0 = difference * 15.0;
+                // move object in that direction (to cursor)!
+                collider_linear_velocity.0 = difference * DRAG_STIFFNESS;
+            }
         }
-    }
+    } else {
+        return;
+    };
 }
