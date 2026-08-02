@@ -1,5 +1,5 @@
 use avian2d::prelude::*;
-use bevy::{camera::Viewport, color::palettes::basic::WHITE, prelude::*};
+use bevy::{color::palettes::basic::WHITE, prelude::*};
 
 fn main() {
     App::new()
@@ -10,7 +10,7 @@ fn main() {
             PhysicsDebugPlugin,
         ))
         .insert_resource(Gravity(Vec2::ZERO))
-        .add_systems(Startup, setup)
+        .add_systems(Startup, (setup, create_cards))
         .add_systems(Update, (draw_cursor, follow_cursor))
         .run();
 }
@@ -33,27 +33,9 @@ fn draw_cursor(
     }
 }
 
-fn setup(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<ColorMaterial>>,
-    window: Single<&Window>,
-) {
-    let window_size = window.resolution.physical_size().as_vec2();
-
+fn setup(mut commands: Commands) {
     // initialise centered, non-window-filling viewport
-    commands.spawn((
-        Camera2d,
-        Camera {
-            viewport: Some(Viewport {
-                physical_position: (window_size * 0.125).as_uvec2(),
-                physical_size: (window_size * 0.75).as_uvec2(),
-                ..default()
-            }),
-            ..default()
-        },
-    ));
+    commands.spawn((Camera2d,));
 
     //Create a UI explaining shit
     commands.spawn((
@@ -65,11 +47,58 @@ fn setup(
             ..default()
         },
     ));
+}
 
+fn create_cards(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+) {
+    // card 1
     commands
         .spawn((
+            Transform::from_xyz(-100.0, 0.0, 0.0),
             RigidBody::Dynamic,
             Collider::rectangle(CARD_W, CARD_H),
+            LinearDamping(1.2),
+            AngularDamping(1.2),
+            Mesh2d(meshes.add(Rectangle::new(CARD_W, CARD_H))),
+            MeshMaterial2d(materials.add(asset_server.load("A_spade.png"))),
+        ))
+        .observe(|event: On<Pointer<DragStart>>, mut commands: Commands| {
+            commands.entity(event.entity).insert(Held);
+        })
+        .observe(|event: On<Pointer<DragEnd>>, mut commands: Commands| {
+            commands.entity(event.entity).remove::<Held>();
+        });
+
+    // card 2
+    commands
+        .spawn((
+            Transform::from_xyz(0.0, 0.0, 0.0),
+            RigidBody::Dynamic,
+            Collider::rectangle(CARD_W, CARD_H),
+            LinearDamping(1.2),
+            AngularDamping(1.2),
+            Mesh2d(meshes.add(Rectangle::new(CARD_W, CARD_H))),
+            MeshMaterial2d(materials.add(asset_server.load("A_spade.png"))),
+        ))
+        .observe(|event: On<Pointer<DragStart>>, mut commands: Commands| {
+            commands.entity(event.entity).insert(Held);
+        })
+        .observe(|event: On<Pointer<DragEnd>>, mut commands: Commands| {
+            commands.entity(event.entity).remove::<Held>();
+        });
+
+    //card 3
+    commands
+        .spawn((
+            Transform::from_xyz(100.0, 0.0, 0.0),
+            RigidBody::Dynamic,
+            Collider::rectangle(CARD_W, CARD_H),
+            LinearDamping(1.2),
+            AngularDamping(1.2),
             Mesh2d(meshes.add(Rectangle::new(CARD_W, CARD_H))),
             MeshMaterial2d(materials.add(asset_server.load("A_spade.png"))),
         ))
@@ -107,7 +136,5 @@ fn follow_cursor(
                 collider_linear_velocity.0 = difference * DRAG_STIFFNESS;
             }
         }
-    } else {
-        return;
-    };
+    }
 }
