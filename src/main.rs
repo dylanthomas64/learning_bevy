@@ -115,7 +115,15 @@ struct Held;
 
 // any item with "Held" should follow the cursor
 fn follow_cursor(
-    mut collider_query: Query<(&Transform, &mut LinearVelocity), With<Held>>,
+    mut collider_query: Query<
+        (
+            &Transform,
+            &mut LinearVelocity,
+            &Rotation,
+            &mut AngularVelocity,
+        ),
+        With<Held>,
+    >,
     window: Single<&Window>,
     camera_query: Single<(&Camera, &GlobalTransform)>,
 ) {
@@ -128,12 +136,23 @@ fn follow_cursor(
             camera.viewport_to_world_2d(camera_transform, cursor_screen_pos)
     {
         // collider_query may have many entities being held
-        for (collider_transform, mut collider_linear_velocity) in collider_query.iter_mut() {
+        for (
+            collider_transform,
+            mut collider_linear_velocity,
+            collider_rotation,
+            mut collider_angular_velocity,
+        ) in collider_query.iter_mut()
+        {
             {
-                let difference = cursor_world_pos - collider_transform.translation.truncate();
-
+                let linear_difference =
+                    cursor_world_pos - collider_transform.translation.truncate();
                 // move object in that direction (to cursor)!
-                collider_linear_velocity.0 = difference * DRAG_STIFFNESS;
+                collider_linear_velocity.0 = linear_difference * DRAG_STIFFNESS;
+
+                // return angle back to zero
+                // rotation is in QUAT, whereas we just read the rotation directly and convert to radians (+- pi)
+                let angular_difference = -collider_rotation.as_radians();
+                collider_angular_velocity.0 = angular_difference * DRAG_STIFFNESS;
             }
         }
     }
