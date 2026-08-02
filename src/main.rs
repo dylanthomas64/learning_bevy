@@ -1,13 +1,5 @@
 use avian2d::prelude::*;
-use bevy::{
-    camera::Viewport,
-    color::palettes::{
-        basic::WHITE,
-        css::{GREEN, RED},
-    },
-    math::{VectorSpace, ops::powf},
-    prelude::*,
-};
+use bevy::{camera::Viewport, color::palettes::basic::WHITE, prelude::*};
 
 fn main() {
     App::new()
@@ -19,7 +11,7 @@ fn main() {
         ))
         .insert_resource(Gravity(Vec2::ZERO))
         .add_systems(Startup, setup)
-        .add_systems(Update, draw_cursor)
+        .add_systems(Update, (draw_cursor, follow_cursor))
         .run();
 }
 
@@ -61,7 +53,7 @@ fn setup(
 
     //Create a UI explaining shit
     commands.spawn((
-        Text::new("mouse will follow the cursor dipshit"),
+        Text::new("pick up the card"),
         Node {
             position_type: PositionType::Absolute,
             top: px(12),
@@ -70,7 +62,7 @@ fn setup(
         },
     ));
 
-    // add a couple of playing cards
+    // add a playing card
     let rectangle_mesh = Rectangle::new(50.0, 70.0);
     commands
         .spawn((
@@ -80,36 +72,37 @@ fn setup(
             Mesh2d(meshes.add(rectangle_mesh)),
             MeshMaterial2d(materials.add(asset_server.load("A_spade.png"))),
         ))
-        .observe(|event: On<Pointer<Over>>| println!("over!"))
-        .observe(on_drag);
+        .observe(|event: On<Pointer<DragStart>>, mut commands: Commands| {
+            commands.entity(event.entity).insert(Held);
+        })
+        .observe(|event: On<Pointer<DragEnd>>, mut commands: Commands| {
+            commands.entity(event.entity).remove::<Held>();
+        });
 }
 
-fn on_drag(
-    mut event: On<Pointer<Drag>>,
-    mut collider_query: Query<(&Transform, &mut LinearVelocity)>,
+#[derive(Component)]
+struct Held;
+
+// any item with "Held" should follow the cursor
+fn follow_cursor(
+    mut collider_query: Query<(&Transform, &mut LinearVelocity), With<Held>>,
     window: Single<&Window>,
     camera_query: Single<(&Camera, &GlobalTransform)>,
 ) {
-    let entity = event.entity;
-    println!("{entity:?} was dragged");
-
     // get the camera (for cursor position) & get its transform (to convert this to world space)
     let (camera, camera_transform) = *camera_query;
 
-    // get the collider's transform (to locate it relative to cursor) & and mut vel in order to affect it!
-    let Ok((collider_transform, mut collider_linear_velocity)) = collider_query.get_mut(entity)
-    else {
-        return;
-    };
+    // collider_query may have many entities being held
+    for (collider_transform, mut collider_linear_velocity) in collider_query.iter_mut() {
+        // get cursor position in screen space and convert to world space
+        if let Some(cursor_screen_pos) = window.cursor_position()
+            && let Ok(cursor_world_pos) =
+                camera.viewport_to_world_2d(camera_transform, cursor_screen_pos)
+        {
+            let difference = cursor_world_pos - collider_transform.translation.truncate();
 
-    // get cursor position in screen space and convert to world space
-    if let Some(cursor_screen_pos) = window.cursor_position()
-        && let Ok(cursor_world_pos) =
-            camera.viewport_to_world_2d(camera_transform, cursor_screen_pos)
-    {
-        let difference = cursor_world_pos - collider_transform.translation.truncate();
-
-        // move object in that direction (to cursor)!
-        collider_linear_velocity.0 = difference;
+            // move object in that direction (to cursor)!
+            collider_linear_velocity.0 = difference * 15.0;
+        }
     }
 }
